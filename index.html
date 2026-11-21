@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soup Symphony</title>
+<meta name="description" content="A playable soup potluck for a birthday celebration.">
+<script defer src="./Tone.js"></script>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:light;--cream:#fff0d5;--ink:#272923;--green:#293a30}
+body{margin:0;background:#f9ebd2;color:var(--ink);font-family:system-ui,sans-serif}
+header,main,footer{width:min(1100px,calc(100% - 32px));margin-inline:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 0;border-bottom:1px solid #a98c64;font-size:14px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+header span:last-child{color:#754023;text-align:right}
+.hero{text-align:center;padding:35px 0 25px}
+h1{font-family:Georgia,serif;font-size:clamp(3.35rem,10vw,7.6rem);line-height:.9;letter-spacing:-.075em;margin:0;color:#8b3026;font-weight:normal}
+.hero p{margin:17px 0 0;line-height:1.45}
+.table{background-color:var(--green);background-image:radial-gradient(ellipse at 50% 10%,#475744,transparent 72%),repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 4px);color:var(--cream);border:1px solid #1d2b23;border-radius:20px;padding:clamp(15px,3vw,30px);box-shadow:0 10px 25px #442b2222}
+.tools{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding-bottom:20px;border-bottom:1px solid #fff0d54a}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+.action{min-height:44px;border-radius:99px;border:1px solid #fff0d579;padding:8px 15px;background:transparent;color:inherit;font-weight:650}
+.action:hover,.action[aria-pressed=true]{background:#fff0d525}
+.action.primary{background:#ffda8d;color:#2a291f;border-color:#ffda8d}
+.action:disabled{opacity:.45;cursor:default}
+button:focus-visible,summary:focus-visible{outline:3px solid #ffca69;outline-offset:4px}
+#status{font-size:14px;margin:0;color:#fbdfae}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 10px;padding:20px 0 4px}
+.bowl{background:none;border:0;color:inherit;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:16px;padding:4px 0 8px;min-width:0}
+.dish{width:min(100%,143px);aspect-ratio:1;position:relative;display:block;margin:0 auto 4px;transition:transform .2s}
+.bowl:hover .dish{transform:translateY(-4px)}
+canvas{display:block;width:100%;height:100%;border-radius:50%;filter:drop-shadow(0 6px 5px #142117b0)}
+.bowl strong{font:normal clamp(1.05rem,2.6vw,1.38rem) Georgia,serif}
+.meta{display:flex;align-items:center;gap:6px;color:#fbdcaf;font-size:14px}
+kbd{font:inherit;font-weight:700;border:1px solid #fff0d56b;min-width:1.4em;border-radius:4px;line-height:1.28}
+.ripple{position:absolute;inset:32%;border:2px solid #fff6c9;border-radius:50%;pointer-events:none;animation:ripple .68s ease-out both}
+@keyframes ripple{from{transform:scale(.3);opacity:.9}to{transform:scale(2.4);opacity:0}}
+details{padding-top:14px;margin-top:12px;border-top:1px solid #fff0d54a;color:#ffe6bd}
+summary{cursor:pointer;width:fit-content;font-weight:650}
+details p{line-height:1.9;margin:8px 0 0}
+footer{text-align:center;padding:20px 0;font:italic 1.05rem Georgia,serif;color:#754023}
+@media(max-width:540px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dish{width:min(100%,118px)}.hero{padding-top:30px}.tools{align-items:flex-start;flex-direction:column}.actions{gap:6px}.action{padding-inline:12px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}.bowl:hover .dish{transform:none}}
+</style>
+</head>
+<body>
+<header><span>The birthday potluck</span><span>♪ &nbsp; Playable soup table</span></header>
+<main>
+<section class="hero"><h1>Soup Symphony</h1><p>Tap the bowls or press <strong>1–8</strong> to make music.<br>Every soup has its own note.</p></section>
+<section class="table" aria-label="Soup instrument">
+<div class="tools">
+<div class="actions"><button type="button" class="action primary" id="birthday">♪ Happy Birthday</button><button type="button" class="action" id="record" aria-pressed="false">● Record</button><button type="button" class="action" id="replay" disabled>Replay</button></div>
+<p id="status" role="status">Tap a bowl to start.</p>
+</div>
+<div class="grid" id="bowls"></div>
+<details><summary>Play the birthday tune yourself</summary><p>1 1 2 1 4 3<br>1 1 2 1 5 4<br>1 1 8 6 4 3 2<br>♭7 ♭7 6 4 5 4</p><p>For the last line, hold <kbd>Shift</kbd> and press <kbd>7</kbd>, or turn on <button type="button" class="action" id="flat" aria-pressed="false">♭7</button>.</p></details>
+</section>
+</main>
+<footer>Happy birthday! Here’s to another bowl.</footer>
+<script>
+const soups = [
+  ['Tomato','C4','#b63b22','#e07435',['#fee4ab','#61803c','#e88743'],'triangle'],
+  ['Miso','D4','#a36527','#d7a44a',['#fff0bf','#53633c','#9e4d26'],'sine'],
+  ['Pea','E4','#577137','#94a45c',['#d9d684','#59863b','#eef1bc'],'triangle'],
+  ['Pumpkin','F4','#bc551c','#ea942e',['#fff0ad','#a95125','#6a7d48'],'sine'],
+  ['Mushroom','G4','#765440','#a88c70',['#e1c1a2','#503c2c','#72774b'],'triangle'],
+  ['Corn','A4','#c38829','#eed171',['#ffe8a4','#e5a82d','#6a853f'],'sine'],
+  ['Beet','B4','#8d264e','#be4a6a',['#ffd2ca','#7d2054','#88914a'],'triangle'],
+  ['Noodle','C5','#b56b32','#e7af59',['#fff0b1','#bb512d','#5d793e'],'sine']
+];
+const grid = document.querySelector('#bowls');
+const status = document.querySelector('#status');
+const record = document.querySelector('#record');
+const replay = document.querySelector('#replay');
+const birthday = document.querySelector('#birthday');
+const flat = document.querySelector('#flat');
+const buttons = [];
+let audio;
+let starting;
+let take = [];
+let recordedAt = null;
+let playback = false;
+
+function paint(canvas, soup, index) {
+  const ctx = canvas.getContext('2d');
+  let state = 5021 + index * 1429;
+  const random = () => ((state = (Math.imul(state,1664525) + 1013904223) >>> 0) / 4294967296);
+  ctx.scale(2,2);
+  const circle = (radius, fill) => {
+    ctx.beginPath();
+    ctx.arc(80,80,radius,0,Math.PI*2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+  };
+  const ceramic = ctx.createLinearGradient(25,15,130,150);
+  ceramic.addColorStop(0,'#fff9df');
+  ceramic.addColorStop(.65,'#e5c99b');
+  ceramic.addColorStop(1,'#986d48');
+  circle(78,ceramic);
+  circle(68,'#ad8059');
+  circle(66,'#f8e8c7');
+  const broth = ctx.createRadialGradient(65,59,6,81,80,65);
+  broth.addColorStop(0,soup[3]);
+  broth.addColorStop(.88,soup[2]);
+  broth.addColorStop(1,'#633325');
+  circle(62,broth);
+  ctx.save();
+  ctx.clip();
+  for(let i=0;i<780;i++){
+    const x=random()*124+18, y=random()*124+18;
+    ctx.fillStyle=i%2?'#fff1be21':'#35190925';
+    ctx.fillRect(x,y,random()*2+.2,random()*1.5+.2);
+  }
+  for(let i=0;i<31;i++){
+    const theta=random()*Math.PI*2, radius=Math.sqrt(random())*56;
+    ctx.save();
+    ctx.translate(80+Math.cos(theta)*radius,80+Math.sin(theta)*radius);
+    ctx.rotate(random()*Math.PI);
+    ctx.fillStyle=soup[4][i%3];
+    ctx.strokeStyle=soup[4][i%3];
+    ctx.beginPath();
+    if(index===7 && i%3===0){
+      ctx.lineWidth=2;
+      ctx.moveTo(-12,0);
+      ctx.bezierCurveTo(-4,-12,2,12,12,0);
+      ctx.stroke();
+    }else if(index===1 && i%3===0){
+      ctx.fillRect(-3,-3,7,7);
+    }else{
+      ctx.ellipse(0,0,2+random()*3,1+random()*2.3,0,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.strokeStyle='#ffe7ae5c';
+  ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.arc(79,79,56,3.7,5.3);
+  ctx.stroke();
+  ctx.restore();
+}
+soups.forEach((soup,index) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'bowl';
+  button.innerHTML = '<span class="dish"><canvas width="320" height="320" aria-hidden="true"></canvas></span><strong></strong><span class="meta"><kbd></kbd><span></span></span>';
+  button.querySelector('strong').textContent = soup[0];
+  button.querySelector('kbd').textContent = index+1;
+  button.querySelector('.meta span').textContent = soup[1];
+  paint(button.querySelector('canvas'),soup,index);
+  button.addEventListener('click',() => tap(index,index===6 && flat.ariaPressed==='true'));
+  buttons.push(button);
+  grid.append(button);
+});
+flat.addEventListener('click',() => {
+  const enabled = flat.ariaPressed !== 'true';
+  flat.ariaPressed = String(enabled);
+  buttons[6].querySelector('.meta span').textContent = enabled ? 'Bb4' : 'B4';
+});
+document.addEventListener('keydown',event => {
+  if(event.repeat || event.metaKey || event.ctrlKey || event.altKey || !/^Digit[1-8]$/.test(event.code)) return;
+  const index = Number(event.code.slice(-1))-1;
+  tap(index,index===6 && (event.shiftKey || flat.ariaPressed==='true'));
+});
+
+async function startAudio(){
+  if(audio) return audio;
+  if(starting) return starting;
+  starting = (async () => {
+    if(window.Tone){
+      await Tone.start();
+      const synths = ['triangle','sine'].map(type => new Tone.PolySynth(Tone.Synth,{
+        oscillator:{type},
+        envelope:{attack:.008,decay:.19,sustain:.19,release:.28},
+        volume:-11
+      }).toDestination());
+      return {
+        now:() => Tone.now(),
+        play:(index,note,duration,time) => synths[soups[index][5]==='triangle'?0:1].triggerAttackRelease(note,duration,time,.76)
+      };
+    }
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    await context.resume();
+    const pitches = ['C4','D4','E4','F4','G4','A4','Bb4','B4','C5'];
+    const midi = [60,62,64,65,67,69,70,71,72];
+    return {
+      now:() => context.currentTime+.025,
+      play(index,note,duration,time){
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = soups[index][5];
+        oscillator.frequency.value = 440*2**((midi[pitches.indexOf(note)]-69)/12);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        gain.gain.setValueAtTime(.001,time);
+        gain.gain.exponentialRampToValueAtTime(.13,time+.01);
+        gain.gain.exponentialRampToValueAtTime(.001,time+duration+.23);
+        oscillator.start(time);
+        oscillator.stop(time+duration+.24);
+      }
+    };
+  })();
+  try { audio = await starting; return audio; }
+  finally { starting = null; }
+}
+function ripple(index){
+  const ring = document.createElement('span');
+  ring.className = 'ripple';
+  ring.setAttribute('aria-hidden','true');
+  buttons[index].querySelector('.dish').append(ring);
+  ring.addEventListener('animationend',() => ring.remove(),{once:true});
+}
+async function tap(index,isFlat){
+  const note = isFlat ? 'Bb4' : soups[index][1];
+  ripple(index);
+  if(recordedAt!==null && take.length<256){
+    take.push({index,note,duration:.2,offset:(performance.now()-recordedAt)/1000});
+    if(take.length===256) stopRecording('Recording saved at 256 notes.');
+  }
+  try{
+    const engine = await startAudio();
+    engine.play(index,note,.2,engine.now());
+    if(!playback && recordedAt===null) status.textContent = soups[index][0] + ' · ' + note;
+  }catch{
+    status.textContent = 'Sound could not start. Tap a bowl to try again.';
+  }
+}
+function stopRecording(message){
+  recordedAt = null;
+  record.ariaPressed = 'false';
+  record.textContent = '● Record';
+  birthday.disabled = false;
+  replay.disabled = take.length===0;
+  status.textContent = message;
+}
+record.addEventListener('click',() => {
+  if(recordedAt!==null){
+    stopRecording(take.length ? 'Recording ready to replay.' : 'Tap Record, then play a few bowls.');
+    return;
+  }
+  take = [];
+  recordedAt = performance.now();
+  record.ariaPressed = 'true';
+  record.textContent = '■ Stop';
+  birthday.disabled = true;
+  replay.disabled = true;
+  status.textContent = 'Recording… play the bowls.';
+});
+async function perform(notes,label){
+  if(playback || recordedAt!==null || !notes.length) return;
+  playback = true;
+  birthday.disabled = record.disabled = replay.disabled = true;
+  try{
+    const engine = await startAudio();
+    const first = notes[0].offset;
+    const start = engine.now()+.09;
+    status.textContent = label;
+    for(const {index,note,duration,offset} of notes){
+      const when = start+offset-first;
+      engine.play(index,note,duration,when);
+      setTimeout(() => ripple(index),Math.max(0,(when-engine.now()+.025)*1000));
+    }
+    const last = notes.at(-1);
+    await new Promise(resolve => setTimeout(resolve,(last.offset-first+last.duration+.45)*1000));
+    status.textContent = 'Play the bowls to keep the music going.';
+  }catch{
+    status.textContent = 'Sound could not start. Try again.';
+  }finally{
+    playback = false;
+    birthday.disabled = record.disabled = false;
+    replay.disabled = take.length===0;
+  }
+}
+replay.addEventListener('click',() => perform(take,'Playing your recording…'));
+birthday.addEventListener('click',() => {
+  let offset = 0;
+  const melody = [[1,.5],[1,.5],[2,1],[1,1],[4,1],[3,2],[1,.5],[1,.5],[2,1],[1,1],[5,1],[4,2],[1,.5],[1,.5],[8,1],[6,1],[4,1],[3,1],[2,2],[7,.5,true],[7,.5,true],[6,1],[4,1],[5,1],[4,2]];
+  const phrase = melody.map(([key,beats,isFlat]) => {
+    const index=key-1;
+    const event = {index,note:isFlat?'Bb4':soups[index][1],duration:beats*.39,offset};
+    offset += beats*.46;
+    return event;
+  });
+  perform(phrase,'Happy birthday! Sing along.');
+});
+</script>
+</body>
+</html>
