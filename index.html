@@ -33,7 +33,8 @@ button:focus-visible,summary:focus-visible{outline:3px solid #ffca69;outline-off
 .bowl{background:none;border:0;color:inherit;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:16px;padding:4px 0 8px;min-width:0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .dish{width:min(100%,143px);aspect-ratio:1;position:relative;display:block;margin:0 auto 4px;transition:transform .2s}
 @media(hover:hover){.bowl:hover .dish{transform:translateY(-4px)}}
-.bowl:active .dish{transform:scale(.95);transition-duration:.06s}
+.bowl:active .dish,.bowl.held .dish{transform:scale(.95);transition-duration:.06s}
+.bowl.held canvas{filter:drop-shadow(0 0 10px #ffe7a0a6) drop-shadow(0 4px 4px #142117b0)}
 canvas{display:block;width:100%;height:100%;border-radius:50%;filter:drop-shadow(0 6px 5px #142117b0)}
 .bowl strong{font:normal clamp(1.05rem,2.6vw,1.38rem) Georgia,serif}
 .meta{display:flex;align-items:center;gap:6px;color:#fbdcaf;font-size:14px}
@@ -87,7 +88,7 @@ footer{text-align:center;padding:20px 0 max(20px,env(safe-area-inset-bottom));fo
   .bowl strong{font-size:clamp(.8rem,1.8vw,1.05rem)}
   .meta{font-size:12px}
 }
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}.bowl:hover .dish,.bowl:active .dish{transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}.bowl:hover .dish,.bowl:active .dish,.bowl.held .dish{transform:none}}
 </style>
 </head>
 <body>
@@ -202,14 +203,18 @@ soups.forEach((soup,index) => {
   button.querySelector('kbd').textContent = index+1;
   button.querySelector('.meta span').textContent = soup[1];
   paint(button.querySelector('canvas'),soup,index);
-  const play = () => tap(index,index===6 && flat.ariaPressed==='true');
-  // Fire on press (not release) so taps feel immediate on touch screens.
+  const isFlat = () => index===6 && flat.ariaPressed==='true';
+  // Start on press and sustain until the finger/mouse lifts.
   button.addEventListener('pointerdown',event => {
     if(event.pointerType==='mouse' && event.button!==0) return;
-    play();
+    press('pointer'+event.pointerId,index,isFlat());
   });
   // Keyboard activation (Enter/Space) arrives as a click with detail 0.
-  button.addEventListener('click',event => { if(event.detail===0) play(); });
+  button.addEventListener('click',event => {
+    if(event.detail!==0) return;
+    press('click',index,isFlat());
+    release('click');
+  });
   button.addEventListener('contextmenu',event => event.preventDefault());
   buttons.push(button);
   grid.append(button);
@@ -222,8 +227,13 @@ flat.addEventListener('click',() => {
 document.addEventListener('keydown',event => {
   if(intro.open || event.repeat || event.metaKey || event.ctrlKey || event.altKey || !/^Digit[1-8]$/.test(event.code)) return;
   const index = Number(event.code.slice(-1))-1;
-  tap(index,index===6 && (event.shiftKey || flat.ariaPressed==='true'));
+  press(event.code,index,index===6 && (event.shiftKey || flat.ariaPressed==='true'));
 });
+document.addEventListener('keyup',event => release(event.code));
+['pointerup','pointercancel'].forEach(type => document.addEventListener(type,event => release('pointer'+event.pointerId)));
+// Never leave a note stuck if the page loses focus mid-hold.
+window.addEventListener('blur',releaseAll);
+document.addEventListener('visibilitychange',() => { if(document.hidden) releaseAll(); });
 
 let rawContext;
 // Touch pointerdown doesn't count as a user gesture for audio, so resume the
@@ -242,34 +252,58 @@ async function startAudio(){
     try { if(navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
     if(window.Tone){
       await Tone.start();
+      // Small look-ahead keeps live taps responsive.
+      Tone.getContext().lookAhead = .02;
       const synths = ['triangle','sine'].map(type => new Tone.PolySynth(Tone.Synth,{
         oscillator:{type},
-        envelope:{attack:.008,decay:.19,sustain:.19,release:.28},
+        envelope:{attack:.008,decay:.19,sustain:.35,release:.28},
         volume:-11
       }).toDestination());
+      const synthFor = index => synths[soups[index][5]==='triangle'?0:1];
       return {
         now:() => Tone.now(),
-        play:(index,note,duration,time) => synths[soups[index][5]==='triangle'?0:1].triggerAttackRelease(note,duration,time,.76)
+        play:(index,note,duration,time) => synthFor(index).triggerAttackRelease(note,duration,time,.76),
+        attack(index,note,time){
+          const synth = synthFor(index);
+          synth.triggerAttack(note,time,.76);
+          return {synth,note};
+        },
+        release:({synth,note},time) => synth.triggerRelease(note,time)
       };
     }
     const context = rawContext = new (window.AudioContext || window.webkitAudioContext)();
     await context.resume();
     const pitches = ['C4','D4','E4','F4','G4','A4','Bb4','B4','C5'];
     const midi = [60,62,64,65,67,69,70,71,72];
+    const voice = (index,note,time) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = soups[index][5];
+      oscillator.frequency.value = 440*2**((midi[pitches.indexOf(note)]-69)/12);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      gain.gain.setValueAtTime(.001,time);
+      gain.gain.exponentialRampToValueAtTime(.13,time+.01);
+      oscillator.start(time);
+      return {oscillator,gain:gain.gain};
+    };
     return {
       now:() => context.currentTime+.025,
       play(index,note,duration,time){
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        oscillator.type = soups[index][5];
-        oscillator.frequency.value = 440*2**((midi[pitches.indexOf(note)]-69)/12);
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        gain.gain.setValueAtTime(.001,time);
-        gain.gain.exponentialRampToValueAtTime(.13,time+.01);
-        gain.gain.exponentialRampToValueAtTime(.001,time+duration+.23);
-        oscillator.start(time);
+        const {oscillator,gain} = voice(index,note,time);
+        gain.exponentialRampToValueAtTime(.001,time+duration+.23);
         oscillator.stop(time+duration+.24);
+      },
+      attack(index,note,time){
+        const held = voice(index,note,time);
+        held.gain.setTargetAtTime(.13*.35,time+.01,.07);
+        return held;
+      },
+      release({oscillator,gain},time){
+        if(gain.cancelAndHoldAtTime) gain.cancelAndHoldAtTime(time);
+        else { gain.cancelScheduledValues(time); gain.setValueAtTime(gain.value,time); }
+        gain.setTargetAtTime(.0001,time,.07);
+        oscillator.stop(time+.6);
       }
     };
   })();
@@ -283,21 +317,43 @@ function ripple(index){
   buttons[index].querySelector('.dish').append(ring);
   ring.addEventListener('animationend',() => ring.remove(),{once:true});
 }
-async function tap(index,isFlat){
+// Notes currently held down, keyed by pointer id or key code.
+const held = new Map();
+const MIN_NOTE = .2;
+async function press(key,index,isFlat){
+  if(held.has(key)) return;
   const note = isFlat ? 'Bb4' : soups[index][1];
+  const entry = {index,started:performance.now(),released:false};
+  held.set(key,entry);
   ripple(index);
+  buttons[index].classList.add('held');
   if(recordedAt!==null && take.length<256){
-    take.push({index,note,duration:.2,offset:(performance.now()-recordedAt)/1000});
+    entry.event = {index,note,duration:MIN_NOTE,offset:(entry.started-recordedAt)/1000};
+    take.push(entry.event);
     if(take.length===256) stopRecording('Recording saved at 256 notes.');
   }
   try{
     const engine = await startAudio();
-    engine.play(index,note,.2,engine.now());
+    // Released before sound was ready (e.g. first tap on a phone): play a short note.
+    if(entry.released) engine.play(index,note,MIN_NOTE,engine.now());
+    else { entry.engine = engine; entry.voice = engine.attack(index,note,engine.now()); }
     if(!playback && recordedAt===null) status.textContent = soups[index][0] + ' · ' + note;
   }catch{
     status.textContent = 'Sound could not start. Tap a bowl to try again.';
   }
 }
+function release(key){
+  const entry = held.get(key);
+  if(!entry) return;
+  held.delete(key);
+  entry.released = true;
+  if(![...held.values()].some(other => other.index===entry.index)) buttons[entry.index].classList.remove('held');
+  const heldFor = (performance.now()-entry.started)/1000;
+  if(entry.event) entry.event.duration = Math.max(MIN_NOTE,heldFor);
+  // Quick taps still ring for the same short length as before.
+  if(entry.voice) entry.engine.release(entry.voice,entry.engine.now()+Math.max(0,MIN_NOTE-heldFor));
+}
+function releaseAll(){ [...held.keys()].forEach(release); }
 function stopRecording(message){
   recordedAt = null;
   record.ariaPressed = 'false';
@@ -333,8 +389,8 @@ async function perform(notes,label){
       engine.play(index,note,duration,when);
       setTimeout(() => ripple(index),Math.max(0,(when-engine.now()+.025)*1000));
     }
-    const last = notes.at(-1);
-    await new Promise(resolve => setTimeout(resolve,(last.offset-first+last.duration+.45)*1000));
+    const end = Math.max(...notes.map(({offset,duration}) => offset+duration));
+    await new Promise(resolve => setTimeout(resolve,(end-first+.45)*1000));
     status.textContent = 'Play the bowls to keep the music going.';
     return true;
   }catch{
