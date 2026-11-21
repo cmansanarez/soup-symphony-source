@@ -2,16 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f9ebd2">
 <title>Soup Symphony</title>
 <meta name="description" content="A playable soup potluck for a birthday celebration.">
 <script defer src="./Tone.js"></script>
 <style>
 *{box-sizing:border-box}
-:root{color-scheme:light;--cream:#fff0d5;--ink:#272923;--green:#293a30}
-body{margin:0;background:#f9ebd2;color:var(--ink);font-family:system-ui,sans-serif}
-header,main,footer{width:min(1100px,calc(100% - 32px));margin-inline:auto}
-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 0;border-bottom:1px solid #a98c64;font-size:14px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+:root{color-scheme:light;--cream:#fff0d5;--ink:#272923;--green:#293a30;--gutter:max(16px,env(safe-area-inset-left),env(safe-area-inset-right))}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:#f9ebd2;color:var(--ink);font-family:system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+header,main,footer{width:min(1100px,calc(100% - 2 * var(--gutter)));margin-inline:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:max(18px,env(safe-area-inset-top)) 0 18px;border-bottom:1px solid #a98c64;font-size:14px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
 header span:last-child{color:#754023;text-align:right}
 .hero{text-align:center;padding:35px 0 25px}
 h1{font-family:Georgia,serif;font-size:clamp(3.35rem,10vw,7.6rem);line-height:.9;letter-spacing:-.075em;margin:0;color:#8b3026;font-weight:normal}
@@ -27,9 +29,11 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 button:focus-visible,summary:focus-visible{outline:3px solid #ffca69;outline-offset:4px}
 #status{font-size:14px;margin:0;color:#fbdfae}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 10px;padding:20px 0 4px}
-.bowl{background:none;border:0;color:inherit;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:16px;padding:4px 0 8px;min-width:0}
+.grid,.bowl{touch-action:manipulation}
+.bowl{background:none;border:0;color:inherit;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:16px;padding:4px 0 8px;min-width:0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .dish{width:min(100%,143px);aspect-ratio:1;position:relative;display:block;margin:0 auto 4px;transition:transform .2s}
-.bowl:hover .dish{transform:translateY(-4px)}
+@media(hover:hover){.bowl:hover .dish{transform:translateY(-4px)}}
+.bowl:active .dish{transform:scale(.95);transition-duration:.06s}
 canvas{display:block;width:100%;height:100%;border-radius:50%;filter:drop-shadow(0 6px 5px #142117b0)}
 .bowl strong{font:normal clamp(1.05rem,2.6vw,1.38rem) Georgia,serif}
 .meta{display:flex;align-items:center;gap:6px;color:#fbdcaf;font-size:14px}
@@ -37,24 +41,56 @@ kbd{font:inherit;font-weight:700;border:1px solid #fff0d56b;min-width:1.4em;bord
 .ripple{position:absolute;inset:32%;border:2px solid #fff6c9;border-radius:50%;pointer-events:none;animation:ripple .68s ease-out both}
 @keyframes ripple{from{transform:scale(.3);opacity:.9}to{transform:scale(2.4);opacity:0}}
 details{padding-top:14px;margin-top:12px;border-top:1px solid #fff0d54a;color:#ffe6bd}
-summary{cursor:pointer;width:fit-content;font-weight:650}
+summary{cursor:pointer;width:fit-content;font-weight:650;padding:10px 0}
 details p{line-height:1.9;margin:8px 0 0}
-footer{text-align:center;padding:20px 0;font:italic 1.05rem Georgia,serif;color:#754023}
-@media(max-width:540px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dish{width:min(100%,118px)}.hero{padding-top:30px}.tools{align-items:flex-start;flex-direction:column}.actions{gap:6px}.action{padding-inline:12px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}.bowl:hover .dish{transform:none}}
+footer{text-align:center;padding:20px 0 max(20px,env(safe-area-inset-bottom));font:italic 1.05rem Georgia,serif;color:#754023}
+@media(hover:none) and (pointer:coarse){.keys-hint{display:none}}
+@media(max-width:540px){
+  header{flex-direction:column;justify-content:center;gap:4px;padding-bottom:12px;font-size:11px;text-align:center}
+  header span:last-child{text-align:center}
+  .hero{padding:22px 0 16px}
+  .hero p{margin-top:12px;font-size:15px}
+  .table{border-radius:16px;padding:14px 12px}
+  .tools{flex-direction:column;align-items:stretch;gap:10px;padding-bottom:14px}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #birthday{grid-column:1/-1}
+  .actions .action{padding-inline:10px}
+  #status{text-align:center;min-height:1.45em}
+  .grid{gap:14px 6px;padding-top:16px}
+  .bowl{gap:3px;padding:2px 0 4px}
+  .dish{width:100%;margin-bottom:2px}
+  .bowl strong{font-size:clamp(.78rem,3.7vw,1rem);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{font-size:12px;gap:4px}
+  details p{line-height:1.75}
+  footer{font-size:.95rem}
+}
+@media(orientation:landscape) and (max-height:540px){
+  header{padding-bottom:8px;font-size:12px}
+  .hero{padding:10px 0 12px}
+  h1{font-size:clamp(2.2rem,7vh,3.2rem)}
+  .hero p{margin-top:6px;font-size:14px}
+  .hero p br{display:none}
+  .table{padding:12px 16px}
+  .tools{padding-bottom:10px}
+  .grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:8px 6px;padding-top:12px}
+  .dish{width:min(100%,96px)}
+  .bowl strong{font-size:clamp(.8rem,1.8vw,1.05rem)}
+  .meta{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition:none!important}.bowl:hover .dish,.bowl:active .dish{transform:none}}
 </style>
 </head>
 <body>
 <header><span>The birthday potluck</span><span>♪ &nbsp; Playable soup table</span></header>
 <main>
-<section class="hero"><h1>Soup Symphony</h1><p>Tap the bowls or press <strong>1–8</strong> to make music.<br>Every soup has its own note.</p></section>
+<section class="hero"><h1>Soup Symphony</h1><p>Tap the bowls<span class="keys-hint"> or press <strong>1–8</strong></span> to make music. <br>Every soup has its own note.</p></section>
 <section class="table" aria-label="Soup instrument">
 <div class="tools">
 <div class="actions"><button type="button" class="action primary" id="birthday">♪ Happy Birthday</button><button type="button" class="action" id="record" aria-pressed="false">● Record</button><button type="button" class="action" id="replay" disabled>Replay</button></div>
 <p id="status" role="status">Tap a bowl to start.</p>
 </div>
 <div class="grid" id="bowls"></div>
-<details><summary>Play the birthday tune yourself</summary><p>1 1 2 1 4 3<br>1 1 2 1 5 4<br>1 1 8 6 4 3 2<br>♭7 ♭7 6 4 5 4</p><p>For the last line, hold <kbd>Shift</kbd> and press <kbd>7</kbd>, or turn on <button type="button" class="action" id="flat" aria-pressed="false">♭7</button>.</p></details>
+<details><summary>Play the birthday tune yourself</summary><p>1 1 2 1 4 3<br>1 1 2 1 5 4<br>1 1 8 6 4 3 2<br>♭7 ♭7 6 4 5 4</p><p>For the last line, <span class="keys-hint">hold <kbd>Shift</kbd> and press <kbd>7</kbd>, or </span>turn on<button type="button" class="action" id="flat" aria-pressed="false">♭7</button>.</p></details>
 </section>
 </main>
 <footer>Happy birthday! Here’s to another bowl.</footer>
@@ -149,7 +185,15 @@ soups.forEach((soup,index) => {
   button.querySelector('kbd').textContent = index+1;
   button.querySelector('.meta span').textContent = soup[1];
   paint(button.querySelector('canvas'),soup,index);
-  button.addEventListener('click',() => tap(index,index===6 && flat.ariaPressed==='true'));
+  const play = () => tap(index,index===6 && flat.ariaPressed==='true');
+  // Fire on press (not release) so taps feel immediate on touch screens.
+  button.addEventListener('pointerdown',event => {
+    if(event.pointerType==='mouse' && event.button!==0) return;
+    play();
+  });
+  // Keyboard activation (Enter/Space) arrives as a click with detail 0.
+  button.addEventListener('click',event => { if(event.detail===0) play(); });
+  button.addEventListener('contextmenu',event => event.preventDefault());
   buttons.push(button);
   grid.append(button);
 });
@@ -164,10 +208,21 @@ document.addEventListener('keydown',event => {
   tap(index,index===6 && (event.shiftKey || flat.ariaPressed==='true'));
 });
 
+let rawContext;
+// Touch pointerdown doesn't count as a user gesture for audio, so resume the
+// context again on events that do (pointerup / touchend / keydown).
+function unlockAudio(){
+  const context = window.Tone ? Tone.getContext().rawContext : rawContext;
+  if(context && context.state!=='running') context.resume().catch(() => {});
+}
+['pointerup','touchend','keydown'].forEach(type => document.addEventListener(type,unlockAudio,{passive:true}));
+
 async function startAudio(){
   if(audio) return audio;
   if(starting) return starting;
   starting = (async () => {
+    // Let iPhones play sound even when the ring/silent switch is on silent.
+    try { if(navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
     if(window.Tone){
       await Tone.start();
       const synths = ['triangle','sine'].map(type => new Tone.PolySynth(Tone.Synth,{
@@ -180,7 +235,7 @@ async function startAudio(){
         play:(index,note,duration,time) => synths[soups[index][5]==='triangle'?0:1].triggerAttackRelease(note,duration,time,.76)
       };
     }
-    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const context = rawContext = new (window.AudioContext || window.webkitAudioContext)();
     await context.resume();
     const pitches = ['C4','D4','E4','F4','G4','A4','Bb4','B4','C5'];
     const midi = [60,62,64,65,67,69,70,71,72];
